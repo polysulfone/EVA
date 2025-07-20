@@ -44,25 +44,11 @@ class LabelingWidget(QLabel):
 
 # Video management class
 class VideoManager:
-    def __init__(self, video_path, log_path):
+    def __init__(self, video_path, log_path, spacing=30):
         # 读取标注信息
-        annotation_list = None
-        annotation_prompt = None
+        points_annotation_list_ = None
+        prompts_annotation_list_ = None
         old_version = False
-        if os.path.exists(log_path):
-            try:
-                with open(log_path, 'r') as file:
-                    log_data = json.load(file)
-                if 'history' in [k for k, v in log_data.items()]:
-                    annotation_list = log_data['history']
-                    old_version = True
-                else:
-                    if 'Tracking_Annotation' in [k for k, v in log_data.items()]:
-                        annotation_list = log_data['Tracking_Annotation']
-                    if 'Text_Annotation' in [k for k, v in log_data.items()]:
-                        annotation_prompt = log_data['Text_Annotation']
-            except:
-                pass
 
         # Get video frames
         video = cv2.VideoCapture(video_path)
@@ -80,26 +66,73 @@ class VideoManager:
             s, _ = video.read()
         video_len += 1
 
+        # Load annotation
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, 'r') as file:
+                    log_data = json.load(file)
+                if 'history' in [k for k, v in log_data.items()]:
+                    points_annotation_list_ = log_data['history']
+                    old_version = True
+                else:
+                    if 'Tracking_Annotation' in [k for k, v in log_data.items()]:
+                        points_annotation_list_ = log_data['Tracking_Annotation']
+                    if 'Text_Annotation' in [k for k, v in log_data.items()]:
+                        prompts_annotation_list_ = log_data['Text_Annotation']
+            except:
+                pass
+
         # Get keyframes list
         keyframes_list = []
         for i in range(video_len):
-            if i % 30 == 0 or i == video_len - 1:
+            if i % spacing == 0 or i == video_len - 1:
                 keyframes_list.append(i)
 
         # Initialize annotation list
-        if annotation_list is None:
-            annotation_list = {}
-            for keyframe_index in keyframes_list:
-                annotation_list[str(keyframe_index)] = [None]
+        if type(points_annotation_list_) == list:
+            points_annotation_list = points_annotation_list_
+        else:
+            points_annotation_list = []
+            for i in range(video_len):
+                if points_annotation_list_ is not None:
+                    if str(i) in points_annotation_list_:
+                        points_annotation_list.append(points_annotation_list_[str(i)])
+                    else:
+                        points_annotation_list.append([None])
+                else:
+                    points_annotation_list.append([None])
 
-        if annotation_prompt is None:
-            annotation_prompt = {}
-            for keyframe_index in keyframes_list:
-                annotation_prompt[str(keyframe_index)] = [None]
+        if type(prompts_annotation_list_) == list:
+            prompts_annotation_list = prompts_annotation_list_
+        else:
+            prompts_annotation_list = []
+            for i in range(video_len):
+                if prompts_annotation_list_ is not None:
+                    if str(i) in prompts_annotation_list_:
+                        prompts_annotation_list.append(prompts_annotation_list_[str(i)])
+                    else:
+                        prompts_annotation_list.append([None])
+                else:
+                    prompts_annotation_list.append([None])
 
-        for k, v in annotation_list.items():
-            while len(annotation_prompt[k]) < len(annotation_list[k]):
-                annotation_prompt[k].append(None)
+        # if points_annotation_list is None:
+        #     points_annotation_list = {}
+        #     for keyframe_index in keyframes_list:
+        #         points_annotation_list[str(keyframe_index)] = [None]
+
+        # if prompts_annotation_list is None:
+        #     prompts_annotation_list = {}
+        #     for keyframe_index in keyframes_list:
+        #         prompts_annotation_list[str(keyframe_index)] = [None]
+
+        # for i in range(len(points_annotation_list)):
+        #     while len(prompts_annotation_list[k]) < len(points_annotation_list[k]):
+        #         prompts_annotation_list[k].append(None)
+
+        # for k, v in points_annotation_list.items():
+        #     while len(prompts_annotation_list[k]) < len(points_annotation_list[k]):
+        #         prompts_annotation_list[k].append(None)
+
 
         # Calculate size scaling
         ori_size = [height, width]
@@ -109,7 +142,7 @@ class VideoManager:
         screen_height = screen_geometry.height()
         # screen_width = win32api.GetSystemMetrics(0)
         # screen_height = win32api.GetSystemMetrics(1)
-        scaling = min(screen_width / width / 1.5, screen_height * 1.0 / height) * 0.9
+        scaling = min(screen_width / width / 1.5, screen_height * 1.0 / height) * 0.8
         height = int(height * scaling)
         width = int(width * scaling)
         scaling_size = [height, width]
@@ -119,19 +152,31 @@ class VideoManager:
         if old_version:
             screen_width = 1707
             screen_height = 1067
-            scaling_ = min(screen_width / width / 1.5, screen_height * 1.0 / height) * 0.9
+            scaling_ = min(screen_width / width / 1.5, screen_height * 1.0 / height) * 0.8
             height_ = int(height * scaling_)
             scaling_ = height_ * 1.0 / ori_size[0]
-            annotation_list_fix = {}
-            for k, v in annotation_list.items():
-                annotation_fix = []
-                for pt in v:
-                    if pt is None:
-                        annotation_fix.append(None)
-                    else:
-                        annotation_fix.append([int(pt[0] // scaling_), int(pt[1] // scaling_)])
-                annotation_list_fix[k] = annotation_fix
-            annotation_list = annotation_list_fix
+            annotation_list_fix = []
+            for annotation in points_annotation_list:
+                if annotation is not None:
+                    annotation_fix = []
+                    for pt in annotation:
+                        if pt is None:
+                            annotation_fix.append(None)
+                        else:
+                            annotation_fix.append([int(pt[0] // scaling_), int(pt[1] // scaling_)])
+                    annotation_list_fix.append(annotation_fix)
+                else:
+                    annotation_list_fix.append(None)
+            points_annotation_list = annotation_list_fix
+            # for k, v in points_annotation_list.items():
+            #     annotation_fix = []
+            #     for pt in v:
+            #         if pt is None:
+            #             annotation_fix.append(None)
+            #         else:
+            #             annotation_fix.append([int(pt[0] // scaling_), int(pt[1] // scaling_)])
+            #     annotation_list_fix[k] = annotation_fix
+            # points_annotation_list = annotation_list_fix
 
         # Define class attributes
         self.video = video
@@ -146,8 +191,8 @@ class VideoManager:
 
         # Annotation information
         self.keyframes_list = keyframes_list
-        self.annotation_list = annotation_list
-        self.annotation_prompt = annotation_prompt
+        self.tracking_list = points_annotation_list
+        self.prompt_list = prompts_annotation_list
 
         # Location information
         self.selective_point = 0
@@ -199,66 +244,69 @@ class VideoManager:
         self.highlighted = highlighted
 
     def annotation_insert(self, frame_index, annotation_index):
-        annotation = self.annotation_list[str(frame_index)]
+        annotation = self.tracking_list[frame_index]
         annotation.insert(annotation_index, None)
-        self.annotation_list[str(frame_index)] = annotation
-        annotation = self.annotation_prompt[str(frame_index)]
+        self.tracking_list[frame_index] = annotation
+        annotation = self.prompt_list[frame_index]
         annotation.insert(annotation_index, None)
-        self.annotation_prompt[str(frame_index)] = annotation
+        self.prompt_list[frame_index] = annotation
 
     def annotation_append(self, frame_index):
-        annotation = self.annotation_list[str(frame_index)]
+        annotation = self.tracking_list[frame_index]
         annotation.append(None)
-        self.annotation_list[str(frame_index)] = annotation
-        annotation = self.annotation_prompt[str(frame_index)]
+        self.tracking_list[frame_index] = annotation
+        annotation = self.prompt_list[frame_index]
         annotation.append(None)
-        self.annotation_prompt[str(frame_index)] = annotation
+        self.prompt_list[frame_index] = annotation
 
     def annotation_delete(self, frame_index, annotation_index):
-        annotation = self.annotation_list[str(frame_index)]
+        annotation = self.tracking_list[frame_index]
         annotation.pop(annotation_index)
-        self.annotation_list[str(frame_index)] = annotation
-        annotation = self.annotation_prompt[str(frame_index)]
+        self.tracking_list[frame_index] = annotation
+        annotation = self.prompt_list[frame_index]
         annotation.pop(annotation_index)
-        self.annotation_prompt[str(frame_index)] = annotation
+        self.prompt_list[frame_index] = annotation
 
     def set_annotation(self, frame_index, annotation_index, point):
-        annotation = self.annotation_list[str(frame_index)]
+        annotation = self.tracking_list[frame_index]
         annotation[annotation_index] = (point[0] // self.scaling, point[1] // self.scaling)
-        self.annotation_list[str(frame_index)] = annotation
+        self.tracking_list[frame_index] = annotation
+
+    def set_track_annotation_list(self, annotation_list):
+        self.tracking_list = annotation_list
 
     def set_prompt_annotation(self, frame_index, annotation_index, annotation):
-        annotations = self.annotation_prompt[str(frame_index)]
+        annotations = self.prompt_list[frame_index]
         while annotation_index > len(annotations) - 1:
             annotations.append(None)
         annotations[annotation_index] = annotation
-        self.annotation_prompt[str(frame_index)] = annotations
+        self.prompt_list[frame_index] = annotations
 
     def auto_fill(self, frame_index, auto_fill_setting):
         if auto_fill_setting == 'From first frame':
-            self.annotation_list[str(frame_index)] = copy.deepcopy(self.annotation_list['0'])
-            self.annotation_prompt[str(frame_index)] = copy.deepcopy(self.annotation_prompt['0'])
+            self.tracking_list[frame_index] = copy.deepcopy(self.tracking_list[0])
+            self.prompt_list[frame_index] = copy.deepcopy(self.prompt_list[0])
         elif auto_fill_setting == 'From previous frame':
             keyframe_index = self.keyframes_list[self.keyframes_list.index(frame_index) - 1]
-            self.annotation_list[str(frame_index)] = copy.deepcopy(self.annotation_list[str(keyframe_index)])
-            self.annotation_prompt[str(frame_index)] = copy.deepcopy(self.annotation_prompt[str(keyframe_index)])
+            self.tracking_list[frame_index] = copy.deepcopy(self.tracking_list[keyframe_index])
+            self.prompt_list[frame_index] = copy.deepcopy(self.prompt_list[keyframe_index])
 
     def annotation_auto_fix(self, frame_index):
         keyframe_list = self.keyframes_list
         if frame_index not in keyframe_list or frame_index == 0:
             return []
-        point_annotation_list = self.annotation_list
-        prompt_annotation_list = self.annotation_prompt
+        point_annotation_list = self.tracking_list
+        prompt_annotation_list = self.prompt_list
         changed_list = []
 
         # Point num fix
         try:
-            point_num = len(point_annotation_list['0'])
+            point_num = len(point_annotation_list[0])
         except:
             point_num = 0
         if point_num:
-            ori_point_annotation = point_annotation_list['0']
-            now_point_annotation = point_annotation_list[str(frame_index)]
+            ori_point_annotation = point_annotation_list[0]
+            now_point_annotation = point_annotation_list[frame_index]
             # Remove
             while len(ori_point_annotation) < len(now_point_annotation):
                 self.annotation_delete(frame_index=frame_index, annotation_index=len(now_point_annotation) - 1)
@@ -269,21 +317,21 @@ class VideoManager:
                 self.annotation_append(frame_index)
                 changed_list.append(
                     {'title': '[Point num fix]Frame{}:'.format(frame_index), 'content': 'append a point'})
-        self.annotation_list = point_annotation_list
+        self.tracking_list = point_annotation_list
 
         # Prompt fix
         prompt_fix_flag = False
         try:
-            prompt_num = len(prompt_annotation_list['0'])
+            prompt_num = len(prompt_annotation_list[0])
         except:
             prompt_num = 0
         if prompt_num:
-            for point_index in range(len(prompt_annotation_list[str(frame_index)])):
+            for point_index in range(len(prompt_annotation_list[frame_index])):
                 # Prompt fix
-                prompt_annotation = prompt_annotation_list[str(frame_index)][point_index]
+                prompt_annotation = prompt_annotation_list[frame_index][point_index]
                 if prompt_annotation:
                     # Check other prompt
-                    for k, v in prompt_annotation_list['0'][point_index].items():
+                    for k, v in prompt_annotation_list[0][point_index].items():
                         if k == 'status':
                             continue
                         if k not in prompt_annotation:
@@ -298,7 +346,7 @@ class VideoManager:
                                  'content': 'Modify[{}][{}]->[{}]'.format(k, prompt_annotation[k], v)})
 
                     for k, v in prompt_annotation.items():
-                        if k not in prompt_annotation_list['0'][point_index]:
+                        if k not in prompt_annotation_list[0][point_index]:
                             prompt_fix_flag = True
                             changed_list.append(
                                 {'title': '[Prompt fix]Frame{}/Point{}:'.format(frame_index, point_index),
@@ -309,9 +357,9 @@ class VideoManager:
                         if prompt_annotation:
                             if 'status' in prompt_annotation:
                                 status = prompt_annotation['status']
-                        prompt_annotation_list[str(frame_index)][point_index] = prompt_annotation_list['0'][point_index]
-                        prompt_annotation_list[str(frame_index)][point_index]['status'] = status
-        self.annotation_prompt = prompt_annotation_list
+                        prompt_annotation_list[frame_index][point_index] = prompt_annotation_list[0][point_index]
+                        prompt_annotation_list[frame_index][point_index]['status'] = status
+        self.prompt_list = prompt_annotation_list
 
         return changed_list
 
@@ -319,7 +367,7 @@ class VideoManager:
         def clamp(val, min_val, max_val):
             return max(min_val, min(val, max_val))
 
-        point = self.annotation_list[str(frame_index)][annotation_index]
+        point = self.tracking_list[frame_index][annotation_index]
         if point is None:
             return
         x = x_fix = point[0]
@@ -336,32 +384,32 @@ class VideoManager:
         y_fix = clamp(y_fix, 0, self.ori_size[0] - 1)
         if x != x_fix or y != y_fix:
             point_fix = [x_fix, y_fix]
-            self.annotation_list[str(frame_index)][annotation_index] = point_fix
+            self.tracking_list[frame_index][annotation_index] = point_fix
 
     def cancel_annotation(self, frame_index, annotation_index):
-        annotation = self.annotation_list[str(frame_index)]
+        annotation = self.tracking_list[frame_index]
         annotation[annotation_index] = None
-        self.annotation_list[str(frame_index)] = annotation
+        self.tracking_list[frame_index] = annotation
 
     # Output
     def get_annotation(self, frame_index: int):
         try:
-            return self.annotation_list[str(frame_index)]
+            return self.tracking_list[frame_index]
         except:
             return None
 
     def get_prompt_annotation(self, frame_index, annotation_index):
         try:
-            prompt_annotation = self.annotation_prompt[str(frame_index)][annotation_index]
+            prompt_annotation = self.prompt_list[frame_index][annotation_index]
         except:
             prompt_annotation = None
         return prompt_annotation
 
     def get_annotation_list(self):
-        return self.annotation_list
+        return self.tracking_list
 
     def get_annotation_prompt(self):
-        return self.annotation_prompt
+        return self.prompt_list
 
     def get_keyframe_list(self):
         return self.keyframes_list
@@ -396,16 +444,17 @@ class VideoManager:
         # 标注帧
         frame = self.get_pure_frame(index)
         try:
-            annotation = self.annotation_list[str(index)]
+            annotation = self.tracking_list[index]
         except:
             return frame
         scaling = self.scaling
-        for pt in annotation:
-            if pt is not None:
-                pt = (int(pt[0] * scaling), int(pt[1] * scaling))
-                cv2.circle(frame, pt, 3, point_color, 1)
-                if not only_inner_circle:
-                    cv2.circle(frame, pt, 8, point_color, 2)
+        if annotation is not None:
+            for pt in annotation:
+                if pt is not None:
+                    pt = (int(pt[0] * scaling), int(pt[1] * scaling))
+                    cv2.circle(frame, pt, 3, point_color, 1)
+                    if not only_inner_circle:
+                        cv2.circle(frame, pt, 8, point_color, 2)
         return frame
 
     # Get highlighted frame
@@ -417,21 +466,22 @@ class VideoManager:
 
         frame = self.get_pure_frame(frame_index)
         try:
-            annotation = self.annotation_list[str(frame_index)]
+            annotation = self.tracking_list[frame_index]
         except:
             return frame
         scaling = self.scaling
-        for index, pt in enumerate(annotation):
-            if pt is not None:
-                pt = (int(pt[0] * scaling), int(pt[1] * scaling))
-                if index == annotation_index:
-                    cv2.circle(frame, pt, inner_size, highlight_color, 1)
-                    if not only_inner_circle:
-                        cv2.circle(frame, pt, 10, highlight_color, 2)
-                else:
-                    cv2.circle(frame, pt, 3, point_color, 1)
-                    if not only_inner_circle:
-                        cv2.circle(frame, pt, 8, point_color, 2)
+        if annotation is not None:
+            for index, pt in enumerate(annotation):
+                if pt is not None:
+                    pt = (int(pt[0] * scaling), int(pt[1] * scaling))
+                    if index == annotation_index:
+                        cv2.circle(frame, pt, inner_size, highlight_color, 1)
+                        if not only_inner_circle:
+                            cv2.circle(frame, pt, 10, highlight_color, 2)
+                    else:
+                        cv2.circle(frame, pt, 3, point_color, 1)
+                        if not only_inner_circle:
+                            cv2.circle(frame, pt, 8, point_color, 2)
         return frame
 
     # Get zoomin frame
@@ -444,7 +494,7 @@ class VideoManager:
         scaling = self.scaling
         frame = self.get_highlighted_labeled_frame(frame_index, annotation_index, only_inner_circle=True, inner_size=2)
         try:
-            annotation = self.annotation_list[str(frame_index)][annotation_index]
+            annotation = self.tracking_list[frame_index][annotation_index]
         except:
             return self.get_black_frame()
         if annotation is None:
@@ -483,7 +533,7 @@ class VideoManager:
         frame_index = None
         for index in self.keyframes_list:
             try:
-                annotation = self.annotation_list[str(index)]
+                annotation = self.tracking_list[index]
                 if annotation is not None:
                     frame_index = index
                     break
@@ -666,8 +716,8 @@ class VideoFramePlayer(QWidget):
         return self.video.get_prompt_annotation(frame_index=frame_index, annotation_index=annotation_index)
 
     # Set the video that is currently playing in the form
-    def load_video(self, video_path, log_path):
-        self.video = VideoManager(video_path=video_path, log_path=log_path)
+    def load_video(self, video_path, log_path, annotation_spacing):
+        self.video = VideoManager(video_path=video_path, log_path=log_path, spacing=annotation_spacing)
         self.videoPlayBar.set_frames_num(len(self) - 1)
         self.keyframeIndicator.remake(keyframe_list=self.video.get_keyframe_list(),
                                       progress_bar_len=self.videoPlayBar.get_slider_width())
@@ -917,6 +967,13 @@ class VideoFramePlayer(QWidget):
 
     def get_annotation(self, index):
         return self.video.get_annotation(index)
+
+    # Set all labels
+    def set_all_annotation(self, annotation_list):
+        if self.video is None:
+            return
+        else:
+            self.video.set_track_annotation_list(annotation_list)
 
     def insert_annotation(self, index):
         self.video.annotation_insert(frame_index=self.current_frame, annotation_index=index)

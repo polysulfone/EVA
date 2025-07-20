@@ -115,6 +115,11 @@ class VideoGroupManager(QWidget):
             log_path = log_path.replace('.mp4', '.json')
             return sample_path, log_path
 
+    def get_current_index(self):
+        if self.dataset is None:
+            return None
+        return self.current_video_index
+
     def get_current_video_name(self):
         if self.dataset is None:
             return None

@@ -1,7 +1,9 @@
 # coding:utf-8
 import sys
 import shutil
-from tqdm import tqdm
+
+import numpy as np
+# from tqdm import tqdm
 import os
 import json
 
@@ -10,8 +12,7 @@ from PyQt6.QtGui import QColor, QAction, QShortcut, QKeySequence
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QApplication, QWidget, QFileDialog
 
 from qfluentwidgets import (MSFluentTitleBar, MSFluentWindow,
-                            SubtitleLabel, setFont,
-                            TransparentToolButton,
+                            setFont, TransparentToolButton,
                             isDarkTheme, TransparentDropDownPushButton, RoundMenu, Action,
                             InfoBar, InfoBarPosition)
 from qfluentwidgets import FluentIcon as FIF
@@ -23,6 +24,9 @@ from ui.PromptEditor import PromptEditor
 from ui.VideoGroupManager import DatasetLoader
 from ui.VideoPlayer import VideoManager
 from ui.SettingPage import SettingPage
+from ui.PointTrackingWidget import PointTrackingWidget
+from ui.PointTrackingWidget import PointTracker
+from ui.ProgressBox import ProgressBox
 
 
 direction_list = ['left']
@@ -42,60 +46,60 @@ class Exporter:
         if os.path.exists(output_path):
             shutil.rmtree(output_path)
         os.mkdir(output_path)
-        with tqdm(total=len(self.data_loader)) as pbar:
-            for sample in self.data_loader:
-                # Get the original file path
-                video_path = sample['sample_path']
-                log_path = video_path.replace('.mp4', '.json')
-                log_path = log_path.replace('classification', 'log')
-                calib_file_path = './ui/calib.json'
-                # Classpath construction
-                output_class_path = os.path.join(output_path, str(sample['class_index']))
-                if not os.path.exists(output_class_path):
-                    os.mkdir(output_class_path)
-                output_calib_file_path = os.path.join(output_class_path, 'calib.json')
-                shutil.copyfile(calib_file_path, output_calib_file_path)
-                # Direction path construction
-                for direction in direction_list:
-                    direction_path = os.path.join(output_class_path, direction)
-                    seq_index = sample['sample_index']
-                    seq_path = os.path.join(direction_path, 'seq{:0>3d}'.format(seq_index))
-                    if not os.path.exists(seq_path):
-                        os.makedirs(seq_path)
-                    frames_path = os.path.join(seq_path, 'frames')
-                    if not os.path.exists(frames_path):
-                        os.mkdir(frames_path)
-                    segmentation_path = os.path.join(seq_path, 'segmentation')
-                    if not os.path.exists(segmentation_path):
-                        os.mkdir(segmentation_path)
-                    # Get video information and save the video
-                    video = VideoManager(video_path, log_path)
-                    video_len = len(video)
-                    fps = video.fps
-                    duration = int(video_len * 1000.0 / fps)
-                    video_output_name = '{:0>8d}ms-{:0>8d}ms-visible.mp4'.format(0, duration)
-                    video_output_path = os.path.join(frames_path, video_output_name)
-                    shutil.copyfile(video_path, video_output_path)
-                    # Get the label and save it
-                    point_annotation = video.get_annotation_list()
-                    prompt_annotation = video.get_annotation_prompt()
-                    point_annotation_output_path = os.path.join(segmentation_path, 'labels.json')
-                    prompt_annotation_output_path = os.path.join(segmentation_path, 'texts.json')
-                    with open(point_annotation_output_path, 'w') as f:
-                        data = json.dumps(point_annotation)
-                        f.write(data)
-                    with open(prompt_annotation_output_path, 'w') as f:
-                        data = json.dumps(prompt_annotation)
-                        f.write(data)
-                    # Save visualization file
-                    # video.set_highlighted(False)
-                    # video.set_show_context(False)
-                    # keyframe_list = video.get_keyframe_list()
-                    # for keyframe in keyframe_list:
-                    #     visible_output_name = 'visible_{:0>3d}.png'.format(keyframe)
-                    #     visible_output_path = os.path.join(segmentation_path, visible_output_name)
-                    #     cv2.imwrite(visible_output_path, video[keyframe, 0])
-                pbar.update()
+        # with tqdm(total=len(self.data_loader)) as pbar:
+        for sample in self.data_loader:
+            # Get the original file path
+            video_path = sample['sample_path']
+            log_path = video_path.replace('.mp4', '.json')
+            log_path = log_path.replace('classification', 'log')
+            # calib_file_path = './ui/calib.json'
+            # Classpath construction
+            output_class_path = os.path.join(output_path, str(sample['class_index']))
+            if not os.path.exists(output_class_path):
+                os.mkdir(output_class_path)
+            # output_calib_file_path = os.path.join(output_class_path, 'calib.json')
+            # shutil.copyfile(calib_file_path, output_calib_file_path)
+            # Direction path construction
+            for direction in direction_list:
+                direction_path = os.path.join(output_class_path, direction)
+                seq_index = sample['sample_index']
+                seq_path = os.path.join(direction_path, 'seq{:0>3d}'.format(seq_index))
+                if not os.path.exists(seq_path):
+                    os.makedirs(seq_path)
+                frames_path = os.path.join(seq_path, 'frames')
+                if not os.path.exists(frames_path):
+                    os.mkdir(frames_path)
+                segmentation_path = os.path.join(seq_path, 'segmentation')
+                if not os.path.exists(segmentation_path):
+                    os.mkdir(segmentation_path)
+                # Get video information and save the video
+                video = VideoManager(video_path, log_path)
+                video_len = len(video)
+                fps = video.fps
+                duration = int(video_len * 1000.0 / fps)
+                video_output_name = '{:0>8d}ms-{:0>8d}ms-visible.mp4'.format(0, duration)
+                video_output_path = os.path.join(frames_path, video_output_name)
+                shutil.copyfile(video_path, video_output_path)
+                # Get the label and save it
+                point_annotation = video.get_annotation_list()
+                prompt_annotation = video.get_annotation_prompt()
+                point_annotation_output_path = os.path.join(segmentation_path, 'labels.json')
+                prompt_annotation_output_path = os.path.join(segmentation_path, 'texts.json')
+                with open(point_annotation_output_path, 'w') as f:
+                    data = json.dumps(point_annotation)
+                    f.write(data)
+                with open(prompt_annotation_output_path, 'w') as f:
+                    data = json.dumps(prompt_annotation)
+                    f.write(data)
+                # Save visualization file
+                # video.set_highlighted(False)
+                # video.set_show_context(False)
+                # keyframe_list = video.get_keyframe_list()
+                # for keyframe in keyframe_list:
+                #     visible_output_name = 'visible_{:0>3d}.png'.format(keyframe)
+                #     visible_output_path = os.path.join(segmentation_path, visible_output_name)
+                #     cv2.imwrite(visible_output_path, video[keyframe, 0])
+                # pbar.update()
 
 
 class CustomTitleBar(MSFluentTitleBar):
@@ -191,11 +195,24 @@ class MainWindow(MSFluentWindow):
         # Annotation Manager
         self.viceLayout = QHBoxLayout()
         self.annotationIndicator = IndicatorPanel(self)
-        self.licence = SubtitleLabel('Powered by: Polysulfone')
-        self.licence.setAlignment(Qt.AlignmentFlag.AlignRight)
+        # self.licence = SubtitleLabel('Powered by: Polysulfone')
+        # self.licence.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        # detect devices
+        try:
+            import cupy
+            cuda_num = cupy.cuda.runtime.getDeviceCount()
+        except:
+            cuda_num = 0
+        devices = ['cpu']
+        for index in range(cuda_num):
+            devices.append('gpu:'+str(index))
+
+        self.pointTrackingWidget = PointTrackingWidget(devices=devices)
 
         self.viceLayout.addWidget(self.annotationIndicator, stretch=3)
-        self.viceLayout.addWidget(self.licence, stretch=1)
+        self.viceLayout.addWidget(self.pointTrackingWidget, stretch=1, alignment=Qt.AlignmentFlag.AlignRight)
+        # self.viceLayout.addWidget(self.licence, stretch=1)
         self.vBoxLayout.addLayout(self.viceLayout)
 
         # Configuring signals and slots
@@ -232,6 +249,8 @@ class MainWindow(MSFluentWindow):
         # self.promptEditor.KeyFrameSwitch.connect(self._save_annotation_for_prompt)
         # self.promptEditor.AnnotationSwitch.connect(self._save_annotation_for_prompt)
 
+        self.pointTrackingWidget.button.clicked.connect(self._track_by_model)
+
         self.settingPage.SettingChanged.connect(self._save_setting)
 
         # Configure shortcut keys
@@ -263,7 +282,8 @@ class MainWindow(MSFluentWindow):
         self.prompt_delete_flag = False
         self.folder_path_list = []
 
-        self.simplify_annotation_setting = 'Off'
+        self.simplify_annotation_setting = 'On'
+        self.annotation_spacing = 30
 
     # Create a pop-up message
     def createWarningInfoBar(self, title, content):
@@ -287,6 +307,30 @@ class MainWindow(MSFluentWindow):
             position=InfoBarPosition.TOP_RIGHT,
             # position='Custom',   # NOTE: use custom info bar manager
             duration=2000,
+            parent=self
+        )
+
+    def createFinishInfoBar(self):
+        # convenient class mothod
+        InfoBar.success(
+            title='Tracking finish',
+            content="The tracking progress is finished!",
+            orient=Qt.Orientation.Horizontal,
+            isClosable=False,
+            position=InfoBarPosition.TOP_LEFT,
+            # position='Custom',   # NOTE: use custom info bar manager
+            duration=2000,
+            parent=self
+        )
+
+    def createCancelInfoBar(self):
+        InfoBar.error(
+            title='Cancel',
+            content="The tracking progress is canceled",
+            orient=Qt.Orientation.Horizontal,
+            isClosable=False,
+            position=InfoBarPosition.TOP_LEFT,
+            duration=2000,    # won't disappear automatically
             parent=self
         )
 
@@ -351,6 +395,44 @@ class MainWindow(MSFluentWindow):
         if output_path:
             exporter.export(output_path)
 
+    # Track by model
+    def _track_by_model(self):
+        if self.videoGroupManager.dataset is None:
+            return
+
+        def _update_progress(current_progess):
+            self.progressBox.set_current_progress(current_progess)
+
+        def _finish(result):
+            self.progressBox.close()
+            self.createFinishInfoBar()
+            self.setEnabled(True)
+            self.videoFramePlayer.set_all_annotation(result)
+
+        def _cancel():
+            self.progressBox.close()
+            self.createCancelInfoBar()
+            self.setEnabled(True)
+
+        queries = np.array(self.videoFramePlayer.get_annotation(0))
+        checkpoint_path = './checkpoints/raft_model.onnx'
+        device = self.pointTrackingWidget.get_device()
+
+        self.progressBox = ProgressBox(total_len=len(self.videoFramePlayer.video), parent=self)
+
+
+        self.pointTracker = PointTracker(video=self.videoFramePlayer.video, queries=queries, checkpoint_path=checkpoint_path, device=device)
+
+        self.progressBox.cancel_button.clicked.connect(self.pointTracker.stop)
+
+        self.pointTracker.progress.connect(_update_progress)
+        self.pointTracker.finished.connect(_finish)
+        self.pointTracker.canceled.connect(_cancel)
+
+        self.pointTracker.start()
+        self.setEnabled(False)
+        self.progressBox.set_able()
+
     # Open Prompt Editor
     def _open_prompt_widget(self):
         self.promptEditor.show()
@@ -359,13 +441,14 @@ class MainWindow(MSFluentWindow):
     def _open_setting_widget(self):
         auto_fill_setting = self.videoFramePlayer.get_auto_fill_setting()
         self.settingPage.show()
-        self.settingPage.set_setting({'Auto Fill:': auto_fill_setting, 'Simplify Annotation:': self.simplify_annotation_setting})
+        self.settingPage.set_setting({'Annotation Inheritance:': auto_fill_setting, 'Consistency Enforcement:': self.simplify_annotation_setting, 'Annotation Spacing:': self.annotation_spacing})
 
     # Save setting
     def _save_setting(self, setting_dict):
-        auto_fill_setting = setting_dict['Auto Fill:']
+        auto_fill_setting = setting_dict['Annotation Inheritance:']
         self.videoFramePlayer.set_auto_fill_setting(auto_fill_setting)
-        self.simplify_annotation_setting = setting_dict['Simplify Annotation:']
+        self.simplify_annotation_setting = setting_dict['Consistency Enforcement:']
+        self.annotation_spacing = setting_dict['Annotation Spacing:']
         if self.simplify_annotation_setting == 'On' and self.videoFramePlayer.current_frame:
             self.promptEditor.lock_for_save(True)
             self.annotationIndicator.lock_for_safe(True)
@@ -376,7 +459,7 @@ class MainWindow(MSFluentWindow):
     # Video change slot function
     def _video_changed(self, index):
         video_path, log_path = self.videoGroupManager[index]
-        self.videoFramePlayer.load_video(video_path=video_path, log_path=log_path)
+        self.videoFramePlayer.load_video(video_path=video_path, log_path=log_path, annotation_spacing=self.annotation_spacing)
         # annotation = self.videoFramePlayer.get_annotation(0)
         # self.annotationIndicator.remake(react=False)
         # self.annotationIndicator.load_annotation_list(annotation)
@@ -384,6 +467,11 @@ class MainWindow(MSFluentWindow):
 
     # Frame change slot
     def _frame_changed(self, index):
+        if index == 0:
+            self.pointTrackingWidget.set_enable(True)
+        else:
+            self.pointTrackingWidget.set_enable(False)
+
         if self.videoFramePlayer.is_keyframe() and not self.onplay:
             if self.simplify_annotation_setting == 'On':
                 self.promptEditor.lock_for_save(False)

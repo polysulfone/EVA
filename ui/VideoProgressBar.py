@@ -188,7 +188,8 @@ class MarkerOverlay(QWidget):
     def remake(self, keyframe_list, progress_bar_len):
         self.index_list = keyframe_list
         self.clear_layout()
-        self.add_marker_buttons(progress_bar_len=progress_bar_len)
+        if len(keyframe_list) < 20:
+            self.add_marker_buttons(progress_bar_len=progress_bar_len)
 
     # Set status
     def set_status(self, key_frame_index, status):
